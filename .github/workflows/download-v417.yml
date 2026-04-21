@@ -1,0 +1,34 @@
+name: Download Docker Image v4.1.7
+
+on:
+  workflow_dispatch:
+
+jobs:
+  download-and-upload:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download Docker image v4.1.7
+        run: |
+          echo "⬇️ Descargando OMICS PLAYGROUND v4.1.7 (LATEST)..."
+          docker pull bigomics/omicsplayground:v4.1.7
+          
+      - name: Save and compress image
+        run: |
+          echo "📦 Guardando y comprimiendo..."
+          docker save bigomics/omicsplayground:v4.1.7 | gzip > omicsplayground-v4.1.7.tar.gz
+          
+      - name: Verify file size
+        run: |
+          echo "✅ Tamaño del archivo:"
+          ls -lh omicsplayground-v4.1.7.tar.gz
+          
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: omicsplayground-v4.1.7
+          path: omicsplayground-v4.1.7.tar.gz
+          retention-days: 9
