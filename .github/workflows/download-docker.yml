@@ -1,0 +1,34 @@
+name: Download Docker Image
+
+on:
+  workflow_dispatch:  # Permite ejecutar manualmente
+
+jobs:
+  download-and-upload:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Download Docker image
+        run: |
+          echo "⬇️ Descargando imagen de Docker Hub..."
+          docker pull bigomics/omicsplayground:v3.2.18
+          
+      - name: Save and compress image
+        run: |
+          echo "📦 Guardando y comprimiendo..."
+          docker save bigomics/omicsplayground:v3.2.18 | gzip > omicsplayground.tar.gz
+          
+      - name: Verify file size
+        run: |
+          echo "✅ Tamaño del archivo:"
+          ls -lh omicsplayground.tar.gz
+          
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: omicsplayground-docker
+          path: omicsplayground.tar.gz
+          retention-days: 9
