@@ -1,10 +1,10 @@
-name: Copy Existing Artifacts to MEGA
+name: Copy Artifacts to MEGA
 
 on:
   workflow_dispatch:
     inputs:
       artifact_name:
-        description: 'Nombre del artifact a subir (déjalo vacío para subir todos)'
+        description: 'Nombre del artifact (déjalo vacío para subir todos)'
         required: false
         default: ''
 
@@ -13,75 +13,60 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - name: Get repository info
-        id: repo
-        run: |
-          echo "owner=${{ github.repository_owner }}" >> $GITHUB_OUTPUT
-          echo "repo=${{ github.event.repository.name }}" >> $GITHUB_OUTPUT
+      - name: Download specific artifact
+        if: github.event.inputs.artifact_name != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ github.event.inputs.artifact_name }}
+          path: ./artifacts
           
-      - name: List available artifacts
-        id: list
-        run: |
-          echo "📋 Artifacts disponibles en este repositorio:"
-          curl -s \
-            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/${{ github.repository }}/actions/artifacts" \
-            | jq -r '.artifacts[] | "\(.name) (\(.size / 1024 / 1024 | floor) MB)"'
-            
-      - name: Download artifact(s)
-        run: |
-          mkdir -p ./artifacts
+      - name: Download all artifacts
+        if: github.event.inputs.artifact_name == ''
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
           
-          if [ -n "${{ github.event.inputs.artifact_name }}" ]; then
-            # Descargar artifact específico
-            echo "📥 Descargando: ${{ github.event.inputs.artifact_name }}"
-            curl -sL \
-              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-              "https://api.github.com/repos/${{ github.repository }}/actions/artifacts?name=${{ github.event.inputs.artifact_name }}" \
-              | jq -r '.artifacts[0].archive_download_url' \
-              | xargs curl -L -o ./artifacts/artifact.zip \
-                -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}"
-          else
-            # Descargar todos los artifacts
-            echo "📥 Descargando todos los artifacts..."
-            curl -s \
-              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-              "https://api.github.com/repos/${{ github.repository }}/actions/artifacts" \
-              | jq -r '.artifacts[] | .archive_download_url' \
-              | while read url; do
-                  curl -L -o ./artifacts/artifact.zip \
-                    -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-                    "$url"
-                done
-          fi
+      - name: List downloaded files
+        run: |
+          echo "📁 Archivos descargados:"
+          ls -lh ./artifacts/
           
       - name: Install megatools
-        run: sudo apt install -y megatools
-        
-      - name: Configure MEGA
+        run: |
+          sudo apt update
+          sudo apt install -y megatools
+          
+      - name: Configure MEGA credentials
         run: |
           mkdir -p ~/.megatools
-          cat > ~/.megatools/credentials << EOF
-          [Credentials]
-          Username = ${{ secrets.MEGA_EMAIL }}
-          Password = ${{ secrets.MEGA_PASSWORD }}
-          EOF
+          echo "[Credentials]" > ~/.megatools/credentials
+          echo "Username = ${{ secrets.MEGA_EMAIL }}" >> ~/.megatools/credentials
+          echo "Password = ${{ secrets.MEGA_PASSWORD }}" >> ~/.megatools/credentials
+          chmod 600 ~/.megatools/credentials
+          
+      - name: Test MEGA connection
+        run: |
+          echo "🔍 Probando conexión con MEGA..."
+          megals || echo "⚠️ Error en la conexión"
+          
+      - name: Create MEGA folder
+        run: |
+          megamkdir /OmicsPlayground || echo "La carpeta ya existe"
           
       - name: Upload to MEGA
         run: |
-          echo "📤 Subiendo a MEGA..."
-          megamkdir /OmicsPlayground || true
-          
+          echo "📤 Subiendo archivos a MEGA..."
           cd ./artifacts
-          if [ -f "artifact.zip" ]; then
-            megaput artifact.zip --path /OmicsPlayground
-            echo "✅ ¡Subido a MEGA!"
-          else
-            echo "❌ No se encontró el archivo"
-            exit 1
-          fi
           
-      - name: Verify in MEGA
+          for file in *; do
+            if [ -f "$file" ]; then
+              echo "Subiendo: $file"
+              megaput "$file" --path /OmicsPlayground
+              echo "✅ $file subido"
+            fi
+          done
+          
+      - name: Verify upload
         run: |
-          echo "📋 Contenido de /OmicsPlayground en MEGA:"
+          echo "📋 Archivos en MEGA:"
           megals -l /OmicsPlayground
