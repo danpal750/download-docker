@@ -1,0 +1,17 @@
+name: List Available Artifacts
+
+on:
+  workflow_dispatch:
+
+jobs:
+  list:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: List all artifacts
+        run: |
+          echo "📋 Artifacts disponibles en este repositorio:"
+          curl -s \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/artifacts" \
+            | jq -r '.artifacts[] | "- \(.name) (creado: \(.created_at | split("T")[0]))"'
