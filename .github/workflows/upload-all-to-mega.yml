@@ -1,0 +1,57 @@
+name: Upload ALL Artifacts to MEGA
+
+on:
+  workflow_dispatch:
+
+jobs:
+  upload-all:
+    runs-on: ubuntu-latest
+    
+    steps:
+      # 1. Descargar TODOS los artifacts disponibles
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./all-artifacts
+          
+      - name: List downloaded files
+        run: |
+          echo "📂 Archivos descargados:"
+          ls -lhR ./all-artifacts
+          
+      # 2. Instalar megatools
+      - name: Install megatools
+        run: |
+          sudo apt update
+          sudo apt install -y megatools
+          
+      # 3. Configurar MEGA
+      - name: Configure MEGA
+        run: |
+          mkdir -p ~/.megatools
+          echo "[Credentials]" > ~/.megatools/credentials
+          echo "Username = ${{ secrets.MEGA_EMAIL }}" >> ~/.megatools/credentials
+          echo "Password = ${{ secrets.MEGA_PASSWORD }}" >> ~/.megatools/credentials
+          
+      # 4. Subir a MEGA
+      - name: Upload to MEGA
+        run: |
+          echo "📤 Subiendo archivos a MEGA..."
+          
+          # Crear carpeta
+          megamkdir /OmicsPlayground || true
+          
+          # Subir cada archivo encontrado
+          find ./all-artifacts -type f -name "*.zip" -o -name "*.tar.gz" | while read file; do
+            echo "Subiendo: $file"
+            megaput "$file" --path /OmicsPlayground
+            echo "✅ Subido!"
+          done
+          
+          echo "🏁 Proceso terminado."
+          
+      # 5. Verificar
+      - name: Verify in MEGA
+        run: |
+          echo "📋 Contenido final en MEGA:"
+          megals -l /OmicsPlayground
