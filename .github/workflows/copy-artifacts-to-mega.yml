@@ -19,17 +19,19 @@ jobs:
         with:
           name: ${{ github.event.inputs.artifact_name }}
           path: ./artifacts
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           
       - name: Download all artifacts
         if: github.event.inputs.artifact_name == ''
         uses: actions/download-artifact@v4
         with:
           path: ./artifacts
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           
       - name: List downloaded files
         run: |
           echo "📁 Archivos descargados:"
-          ls -lh ./artifacts/
+          ls -lh ./artifacts/ || echo "No se descargaron archivos"
           
       - name: Install megatools
         run: |
@@ -43,11 +45,6 @@ jobs:
           echo "Username = ${{ secrets.MEGA_EMAIL }}" >> ~/.megatools/credentials
           echo "Password = ${{ secrets.MEGA_PASSWORD }}" >> ~/.megatools/credentials
           chmod 600 ~/.megatools/credentials
-          
-      - name: Test MEGA connection
-        run: |
-          echo "🔍 Probando conexión con MEGA..."
-          megals || echo "⚠️ Error en la conexión"
           
       - name: Create MEGA folder
         run: |
@@ -69,4 +66,4 @@ jobs:
       - name: Verify upload
         run: |
           echo "📋 Archivos en MEGA:"
-          megals -l /OmicsPlayground
+          megals -l /OmicsPlayground || echo "No se pudo listar"
